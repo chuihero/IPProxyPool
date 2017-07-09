@@ -2,6 +2,7 @@
 import sys
 from config import DB_CONFIG
 from util.exception import Con_DB_Fail
+import queue
 
 
 try:
@@ -17,7 +18,7 @@ except Exception as e:
     raise Con_DB_Fail
 
 
-def store_data(queue2, db_proxy_num):
+def store_data(queue2, db_proxy_num,q2_close_flag):
     '''
     读取队列中的数据，写入数据库中
     :param queue2:
@@ -25,9 +26,9 @@ def store_data(queue2, db_proxy_num):
     '''
     successNum = 0
     failNum = 0
-    while True:
+    while not q2_close_flag.is_set():
         try:
-            proxy = queue2.get(timeout=300)
+            proxy = queue2.get(timeout=60)
             if proxy:
 
                 sqlhelper.insert(proxy)
@@ -35,16 +36,25 @@ def store_data(queue2, db_proxy_num):
             else:
                 failNum += 1
             str = 'IPProxyPool----->>>>>>>>Success ip num :%d,Fail ip num:%d' % (successNum, failNum)
+            print(str)
             sys.stdout.write(str + "\r")
             sys.stdout.flush()
+        except queue.Empty:
+            print('empty')
+            continue
+
         except BaseException as e:
+            print(e)
             if db_proxy_num.value != 0:
                 successNum += db_proxy_num.value
                 db_proxy_num.value = 0
                 str = 'IPProxyPool----->>>>>>>>Success ip num :%d,Fail ip num:%d' % (successNum, failNum)
+                print(str)
                 sys.stdout.write(str + "\r")
                 sys.stdout.flush()
                 successNum = 0
                 failNum = 0
+    print('DataStore end')
+
 
 

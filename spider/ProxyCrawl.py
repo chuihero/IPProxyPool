@@ -21,56 +21,62 @@ from validator.Validator import validator, getMyIP, detect_from_db
 '''
 
 
-def startProxyCrawl(queue, db_proxy_num,myip):
-    crawl = ProxyCrawl(queue, db_proxy_num,myip)
+def startProxyCrawl(queue, db_proxy_num,myip,q_close_flag):
+    crawl = ProxyCrawl(queue, db_proxy_num,myip,q_close_flag)
     crawl.run()
 
 
 class ProxyCrawl(object):
     proxies = set()
 
-    def __init__(self, queue, db_proxy_num,myip):
+    def __init__(self, queue, db_proxy_num,myip,queue_close_flag):
         self.crawl_pool = Pool(THREADNUM)
         self.queue = queue
         self.db_proxy_num = db_proxy_num
         self.myip = myip
+        self.queue_close_flag = queue_close_flag
 
 
     def run(self):
-        while True:
-            self.proxies.clear()
-            str = 'IPProxyPool----->>>>>>>>beginning'
+        # while True:
+        self.proxies.clear()
+        str = 'IPProxyPool----->>>>>>>>beginning'
+        sys.stdout.write(str + "\r\n")
+        sys.stdout.flush()
+        proxylist = sqlhelper.select()
+
+        spawns = []
+        for proxy in proxylist:
+            spawns.append(gevent.spawn(detect_from_db, self.myip, proxy, self.proxies))
+            if len(spawns) >= MAX_CHECK_CONCURRENT_PER_PROCESS:
+                gevent.joinall(spawns)
+                spawns= []
+        gevent.joinall(spawns)
+        self.db_proxy_num.value = len(self.proxies)
+        str = 'IPProxyPool----->>>>>>>>db exists ip:%d' % len(self.proxies)
+
+        if len(self.proxies) < MINNUM:
+            str += '\r\nIPProxyPool----->>>>>>>>now ip num < MINNUM,start crawling...'
             sys.stdout.write(str + "\r\n")
             sys.stdout.flush()
-            proxylist = sqlhelper.select()
-
             spawns = []
-            for proxy in proxylist:
-                spawns.append(gevent.spawn(detect_from_db, self.myip, proxy, self.proxies))
-                if len(spawns) >= MAX_CHECK_CONCURRENT_PER_PROCESS:
+            for p in parserList:
+                spawns.append(gevent.spawn(self.crawl, p))
+                if len(spawns) >= MAX_DOWNLOAD_CONCURRENT:
                     gevent.joinall(spawns)
                     spawns= []
             gevent.joinall(spawns)
-            self.db_proxy_num.value = len(self.proxies)
-            str = 'IPProxyPool----->>>>>>>>db exists ip:%d' % len(self.proxies)
+        else:
+            str += '\r\nIPProxyPool----->>>>>>>>now ip num meet the requirement, end.'
+            sys.stdout.write(str + "\r\n")
+            sys.stdout.flush()
 
-            if len(self.proxies) < MINNUM:
-                str += '\r\nIPProxyPool----->>>>>>>>now ip num < MINNUM,start crawling...'
-                sys.stdout.write(str + "\r\n")
-                sys.stdout.flush()
-                spawns = []
-                for p in parserList:
-                    spawns.append(gevent.spawn(self.crawl, p))
-                    if len(spawns) >= MAX_DOWNLOAD_CONCURRENT:
-                        gevent.joinall(spawns)
-                        spawns= []
-                gevent.joinall(spawns)
-            else:
-                str += '\r\nIPProxyPool----->>>>>>>>now ip num meet the requirement,wait UPDATE_TIME...'
-                sys.stdout.write(str + "\r\n")
-                sys.stdout.flush()
+        self.queue.close()
+        self.queue.join_thread()
+        self.queue_close_flag.set()
+        return
 
-            time.sleep(UPDATE_TIME)
+            # time.sleep(UPDATE_TIME)
 
     def crawl(self, parser):
         html_parser = Html_Parser()

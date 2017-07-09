@@ -36,7 +36,7 @@ def detect_from_db(myip, proxy, proxies_set):
 
 
 
-def validator(queue1, queue2, myip):
+def validator(queue1, queue2, myip,q1_close_flag,q2_close_flag):
     tasklist = []
     proc_pool = {}     # 所有进程列表
     cntl_q = Queue()   # 控制信息队列
@@ -53,12 +53,21 @@ def validator(queue1, queue2, myip):
                 pass
                 # print(e)
                 # print(" we are unable to kill pid:%s" % (pid))
+        if q1_close_flag.is_set() \
+            and cntl_q.empty():
+            #q1关闭，子进程为空，准备退出
+            print('close queue2')
+            queue2.close()
+            queue2.join_thread()
+            q2_close_flag.set()
+            break
+
         try:
             # proxy_dict = {'source':'crawl','data':proxy}
             if len(proc_pool) >= config.MAX_CHECK_PROCESS:
                 time.sleep(config.CHECK_WATI_TIME)
                 continue
-            proxy = queue1.get()
+            proxy = queue1.get(timeout=60)
             tasklist.append(proxy)
             if len(tasklist) >= config.MAX_CHECK_CONCURRENT_PER_PROCESS:
                 p = Process(target=process_start, args=(tasklist, myip, queue2, cntl_q))
@@ -67,6 +76,7 @@ def validator(queue1, queue2, myip):
                 tasklist = []
 
         except Exception as e:
+            print(e)
             if len(tasklist) > 0:
                 p = Process(target=process_start, args=(tasklist, myip, queue2, cntl_q))
                 p.start()
@@ -203,6 +213,38 @@ def baidu_check(selfip, proxies):
             types = -1
     return protocol, types, speed
 
+def lianjia_check(selfip,proxy):
+    """
+
+    :param selfip:
+    :param proxy:单独对每个proxy进行测试。
+            对于requests的库，proxies使用{'http':'http://ip:port','https':'http://ip:port'}的字典
+    :return:
+    """
+    start  = time.time()
+    try:
+        req = requests.get('https://bj.lianjia.com/ershoufang/',headers=config.get_header(),
+                            proxies = proxy,timeout=config.TIMEOUT)
+
+        if req.status_code == 200:
+            speed = round(time.time() - start, 2)
+            protocol = 2
+            types = 0
+            print('verified a proxy:%s'%proxy)
+        else:
+            speed = -1
+            protocol = -1
+            types = -1
+
+    except:
+        #请求失败
+        speed = -1
+        protocol = -1
+        types = -1
+    return protocol, types, speed
+
+
+
 def getMyIP():
     try:
         r = requests.get(url=config.TEST_IP, headers=config.get_header(), timeout=config.TIMEOUT)
@@ -213,12 +255,13 @@ def getMyIP():
 
 
 if __name__ == '__main__':
-    ip = '222.186.161.132'
-    port = 3128
-    proxies = {"http": "http://%s:%s" % (ip, port), "https": "http://%s:%s" % (ip, port)}
-    _checkHttpProxy(None,proxies)
+    ip = '111.13.109.27'
+    port = 80
+    proxies = { "http":"http://%s:%s"%(ip,port),"https": "http://%s:%s" % (ip, port)}
+    # _checkHttpProxy(None,proxies)
     # getMyIP()
     # str="{ip:'61.150.43.121',address:'陕西省西安市 西安电子科技大学'}"
     # j = json.dumps(str)
     # str = j['ip']
     # print str
+    lianjia_check('183.243.253.242',proxies)

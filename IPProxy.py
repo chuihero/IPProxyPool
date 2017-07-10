@@ -1,7 +1,7 @@
 # coding:utf-8
 
 from multiprocessing import Value, Queue, Process, Event
-from api.apiServer import start_api_server
+# from api.apiServer import start_api_server
 from db.DataStore import store_data
 
 from validator.Validator import validator, getMyIP

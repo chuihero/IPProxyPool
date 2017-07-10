@@ -40,7 +40,8 @@ def store_data(queue2, db_proxy_num,q2_close_flag):
             sys.stdout.write(str + "\r")
             sys.stdout.flush()
         except queue.Empty:
-            print('empty')
+            # print('empty')
+            # 队列为空，继续
             continue
 
         except BaseException as e:

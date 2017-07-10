@@ -9,7 +9,7 @@ import gevent
 from gevent.pool import Pool
 from multiprocessing import Queue, Process, Value
 
-from api.apiServer import start_api_server
+# from api.apiServer import start_api_server
 from config import THREADNUM, parserList, UPDATE_TIME, MINNUM, MAX_CHECK_CONCURRENT_PER_PROCESS, MAX_DOWNLOAD_CONCURRENT
 from db.DataStore import store_data, sqlhelper
 from spider.HtmlDownloader import Html_Downloader

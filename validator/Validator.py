@@ -226,7 +226,8 @@ def lianjia_check(selfip,proxy):
         req = requests.get('https://bj.lianjia.com/ershoufang/',headers=config.get_header(),
                             proxies = proxy,timeout=config.TIMEOUT)
 
-        if req.status_code == 200:
+        if req.status_code == 200 \
+                and '验证异常流量-链家网' not in req.text:
             speed = round(time.time() - start, 2)
             protocol = 2
             types = 0
@@ -255,7 +256,7 @@ def getMyIP():
 
 
 if __name__ == '__main__':
-    ip = '111.13.109.27'
+    ip = '120.132.71.212'
     port = 80
     proxies = { "http":"http://%s:%s"%(ip,port),"https": "http://%s:%s" % (ip, port)}
     # _checkHttpProxy(None,proxies)
